@@ -1,2 +1,3 @@
 timestamp,commit,branch,message
 2026-05-27 19:38:47,18e8d166231e060c8f7883e2d68070faa6c2ed72,main,Initial commit: tags pipeline
+2026-05-27 19:42:14,5eaddb0e85f593e8c56d3a25e70245e3e7f9ffe6,main,Add per-row odir column to file_paths.csv; make --odir an optional fallback
