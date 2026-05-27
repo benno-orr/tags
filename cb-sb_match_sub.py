@@ -6,11 +6,13 @@ For each row in a file_paths.csv where run == TRUE, submit a cb-sb_match sbatch 
 Output and log locations are caller-supplied so the pipeline is reusable across analyses.
 
 Usage:
-    python cb-sb_match_sub.py --odir-base /path/to/outputs/restored \
+    python cb-sb_match_sub.py [--odir /path/to/outputs] \
                               [--csv config/file_paths.csv] \
                               [--log-dir /path/to/logs] [--dry-run]
 
-Per-sample matcher output lands in <odir-base>/<spl>/df_whitelist.txt.
+Output base is per-row from the CSV 'odir' column, falling back to --odir for blank
+rows; one of the two must supply it. Each invocation creates a timestamped run dir
+<base>/<YYMMDD_HHMMSS>/, and matcher output lands in <run-dir>/<spl>/df_whitelist.txt.
 SLURM logs (<log-dir>/%j_cb-sb_match.{out,err}) override the sbatch wrapper defaults.
 """
 
@@ -56,39 +58,47 @@ def running_job_names():
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("-odir", "--odir", "--odir-base", dest="odir_base", required=True,
-                   help="base dir for per-sample output (<odir>/<spl>/)")
+    p.add_argument("-odir", "--odir", "--odir-base", dest="odir_base", default=None,
+                   help="fallback output base dir, used for rows whose CSV 'odir' "
+                        "column is blank. Output lands in <odir>/<YYMMDD_HHMMSS>/<spl>/.")
     p.add_argument("--csv", default=DEFAULT_CSV,
                    help=f"sample table (default: {DEFAULT_CSV})")
     p.add_argument("--log-dir", default=None,
-                   help="dir for SLURM logs (default: <odir-base>/../logs)")
+                   help="dir for SLURM logs (default: <run-dir>/logs)")
     p.add_argument("--dry-run", action="store_true",
                    help="print sbatch commands without submitting")
     args = p.parse_args()
 
-    # Each invocation gets its own timestamped run dir under the supplied base,
-    # so re-runs never clobber prior output: <odir>/<YYMMDD_HHMMSS>/<spl>/.
+    # One timestamp per invocation. Each output base (CSV 'odir' column, else --odir)
+    # gets its own timestamped run dir <base>/<YYMMDD_HHMMSS>/, so re-runs never clobber.
     stamp = datetime.now().strftime("%y%m%d_%H%M%S")
-    odir_base = os.path.join(os.path.abspath(args.odir_base), stamp)
-    log_dir = os.path.abspath(args.log_dir) if args.log_dir \
-        else os.path.join(odir_base, "logs")
+    cli_base = os.path.abspath(args.odir_base) if args.odir_base else None
     ver = pipeline_version()
-    print(f"run dir: {odir_base}")
     print(f"pipeline commit: {ver['commit'][:12]}"
           f"{' (dirty)' if ver['dirty'] else ''}")
-    if not args.dry_run:
-        os.makedirs(odir_base, exist_ok=True)
-        os.makedirs(log_dir, exist_ok=True)
-        # Provenance: pin each run dir to the pipeline version + inputs that made it.
-        with open(os.path.join(odir_base, "pipeline_version.json"), "w") as fh:
-            json.dump({
-                "timestamp": stamp,
-                "pipeline_dir": PIPE_DIR,
-                "git_commit": ver["commit"],
-                "git_dirty": ver["dirty"],
-                "csv": os.path.abspath(args.csv),
-            }, fh, indent=2)
-        shutil.copy(args.csv, os.path.join(odir_base, "file_paths.used.csv"))
+
+    run_dirs = {}  # output base -> its timestamped run dir, provisioned on first use
+
+    def run_dir_for(base):
+        """Resolve and (once) provision the timestamped run dir for an output base."""
+        base = os.path.abspath(base)
+        if base not in run_dirs:
+            rdir = os.path.join(base, stamp)
+            print(f"run dir: {rdir}")
+            if not args.dry_run:
+                os.makedirs(rdir, exist_ok=True)
+                # Provenance: pin each run dir to the pipeline version + inputs.
+                with open(os.path.join(rdir, "pipeline_version.json"), "w") as fh:
+                    json.dump({
+                        "timestamp": stamp,
+                        "pipeline_dir": PIPE_DIR,
+                        "git_commit": ver["commit"],
+                        "git_dirty": ver["dirty"],
+                        "csv": os.path.abspath(args.csv),
+                    }, fh, indent=2)
+                shutil.copy(args.csv, os.path.join(rdir, "file_paths.used.csv"))
+            run_dirs[base] = rdir
+        return run_dirs[base]
 
     queued = running_job_names()
 
@@ -102,16 +112,22 @@ def main():
             r2       = row["r2_fq"].strip().strip('"')
             wl       = row["wl"].strip().strip('"')
             cb_fmats = row.get("cb_fmats", "").strip().strip('"')
+            base     = row.get("odir", "").strip().strip('"') or cli_base
             if not wl:
                 print(f"  SKIP {spl}: no whitelist")
                 continue
-            odir = os.path.join(odir_base, spl)
-            if os.path.exists(os.path.join(odir, "df_whitelist.txt")):
-                print(f"  SKIP {spl}: output already exists")
+            if not base:
+                print(f"  SKIP {spl}: no odir (set the CSV 'odir' column or pass --odir)")
                 continue
             if f"cbsb_{spl}" in queued:
                 print(f"  SKIP {spl}: already queued")
                 continue
+            rdir = run_dir_for(base)
+            log_dir = os.path.abspath(args.log_dir) if args.log_dir \
+                else os.path.join(rdir, "logs")
+            if not args.dry_run:
+                os.makedirs(log_dir, exist_ok=True)
+            odir = os.path.join(rdir, spl)
             cmd = ["sbatch", f"--job-name=cbsb_{spl}",
                    "-o", os.path.join(log_dir, "%j_cb-sb_match.out"),
                    "-e", os.path.join(log_dir, "%j_cb-sb_match.err"),

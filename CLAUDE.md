@@ -33,7 +33,7 @@ push.sh                  commit + push to benno-orr/tags, logging the reupload
 source /n/app/conda/miniforge3/24.11.3-0/etc/profile.d/conda.sh && conda activate dropme
 
 # 1. SB↔CB matching — one sbatch job per row with run==TRUE
-python cb-sb_match_sub.py --odir <ANALYSIS>/outputs/restored \
+python cb-sb_match_sub.py [--odir <ANALYSIS>/outputs/restored] \
                           [--csv config/file_paths.csv] \
                           [--log-dir <RUN>/logs] [--dry-run]
 
@@ -42,9 +42,10 @@ python run_saturation_all.py --restored-dir <ANALYSIS>/outputs/restored \
                              [--plots-dir <ANALYSIS>/plots] [--plt-id pltBOxx]
 ```
 
-- `--odir` is required (aliases: `--odir-base`, `-odir`). Each invocation creates a fresh
-  timestamped run dir `<odir>/<YYMMDD_HHMMSS>/`, and per-sample output lands in
-  `<run>/<spl>/` — so re-runs never clobber prior output. `--log-dir` defaults to
+- Output base is per-row from the CSV `odir` column, falling back to `--odir` (aliases
+  `--odir-base`, `-odir`) for blank rows — one of the two must supply it. Each invocation
+  creates a fresh timestamped run dir `<base>/<YYMMDD_HHMMSS>/`, and per-sample output lands
+  in `<run>/<spl>/` — so re-runs never clobber prior output. `--log-dir` defaults to
   `<run>/logs`. The launcher passes `-o/-e` to sbatch (overriding the wrapper defaults).
 - Each run dir is stamped with provenance: `pipeline_version.json` (git commit + dirty flag
   of the pipeline checkout, timestamp, csv path) and `file_paths.used.csv` (a snapshot of the
@@ -53,12 +54,13 @@ python run_saturation_all.py --restored-dir <ANALYSIS>/outputs/restored \
 
 ## `config/file_paths.csv`
 
-Columns: `spl, run, r1_fq, r2_fq, puck_csv, wl, cb_fmats`
+Columns: `spl, run, r1_fq, r2_fq, puck_csv, wl, cb_fmats, odir`
 
 - `r1_fq` — R1 FASTQ (CB pos 1–16, UMI pos 17–28); `r2_fq` — R2 (SB = pos 1–8 + pos 27–32, 14 bp).
 - `wl` — CB whitelist (CellRanger `barcodes.tsv.gz` for GEX; `-1` suffix stripped automatically).
 - `cb_fmats` — set to `/n/data1/hms/scrb/chen/lab/bco/misc/arc_cb_fmats.csv` **only** for ATAC
   reverse-complement whitelists (triggers on-load CB conversion); blank for plain GEX.
+- `odir` — per-row output base (`<odir>/<YYMMDD_HHMMSS>/<spl>/`); blank falls back to `--odir`.
 - `puck_csv` is carried for reference; matching does not use it.
 
 The shipped rows are aBO089 examples (all `run=FALSE`); some point at ephemeral `/n/scratch`
