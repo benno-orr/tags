@@ -21,8 +21,10 @@ shift 4
 
 mkdir -p "$o_dir"
 
-# resolve cb-sb_match.py next to this wrapper (works regardless of submit cwd)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# cb-sb_match.py lives beside this wrapper, but under sbatch SLURM copies the batch
+# script to a spool dir, so BASH_SOURCE is unreliable. The launcher passes the real
+# pipeline dir via CBSB_PIPE_DIR; fall back to BASH_SOURCE for direct `bash` runs.
+SCRIPT_DIR="${CBSB_PIPE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 
 python "$SCRIPT_DIR/cb-sb_match.py" \
     "$r1_path" "$r2_path" "$wl_path" "$o_dir" \

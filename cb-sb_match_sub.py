@@ -129,6 +129,7 @@ def main():
                 os.makedirs(log_dir, exist_ok=True)
             odir = os.path.join(rdir, spl)
             cmd = ["sbatch", f"--job-name=cbsb_{spl}",
+                   f"--export=ALL,CBSB_PIPE_DIR={PIPE_DIR}",
                    "-o", os.path.join(log_dir, "%j_cb-sb_match.out"),
                    "-e", os.path.join(log_dir, "%j_cb-sb_match.err"),
                    SBATCH_SCRIPT, r1, r2, wl, odir]
