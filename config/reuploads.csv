@@ -2,3 +2,4 @@ timestamp,commit,branch,message
 2026-05-27 19:38:47,18e8d166231e060c8f7883e2d68070faa6c2ed72,main,Initial commit: tags pipeline
 2026-05-27 19:42:14,5eaddb0e85f593e8c56d3a25e70245e3e7f9ffe6,main,Add per-row odir column to file_paths.csv; make --odir an optional fallback
 2026-05-27 19:53:30,b933d2f0927341ac84028d65e0e8db23fea385b3,main,Fix sbatch wrapper: resolve cb-sb_match.py via CBSB_PIPE_DIR (BASH_SOURCE breaks under SLURM spool dir)
+2026-05-27 20:02:15,be2dee5a1fa6383d5430e0c56532e3de345e0e32,main,Fix xBO368 input paths: correct wl (drop refdata segment) + use merged 260307+260516 S FASTQs
