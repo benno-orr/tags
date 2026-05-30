@@ -24,6 +24,7 @@ import argparse
 import csv
 import gzip
 import io
+import json
 import os
 import subprocess
 from collections import defaultdict
@@ -246,6 +247,9 @@ def parse_args():
     p.add_argument("--cb-fmats", default=None,
                    help="arc_cb_fmats.csv path; if given, whitelist barcodes are "
                         "treated as cb_atac_rc and converted to cb_gex")
+    p.add_argument("--partial", action="store_true",
+                   help="chunked mode: output sorted partial_triplets.tsv + "
+                        "partial_stats.json; skip aggregation")
     return p.parse_args()
 
 
@@ -275,7 +279,21 @@ def main():
             if total_reads % 5_000_000 < args.batch_size:
                 print(f"  {total_reads:,} reads processed...", flush=True)
 
-    aggregate_and_write(tmp_path, args.odir, tmp_dir, total_reads, n_whitelist)
+    if args.partial:
+        sorted_path = os.path.join(args.odir, "partial_triplets.tsv")
+        print("Sorting triplets...", flush=True)
+        subprocess.run(
+            ["sort", "--buffer-size=2G", "--parallel=4",
+             f"-T{tmp_dir}", "-t\t", "-k1,1", "-k2,2", "-k3,3",
+             "-o", sorted_path, tmp_path],
+            check=True,
+        )
+        os.remove(tmp_path)
+        with open(os.path.join(args.odir, "partial_stats.json"), "w") as fh:
+            json.dump({"total_reads": total_reads, "n_whitelist": n_whitelist}, fh)
+        print(f"Partial done: {total_reads:,} reads → {sorted_path}", flush=True)
+    else:
+        aggregate_and_write(tmp_path, args.odir, tmp_dir, total_reads, n_whitelist)
 
 
 if __name__ == "__main__":
