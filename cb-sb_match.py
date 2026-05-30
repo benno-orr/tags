@@ -23,6 +23,7 @@ Optional:
 import argparse
 import csv
 import gzip
+import io
 import os
 import subprocess
 from collections import defaultdict
@@ -104,8 +105,15 @@ def process_batch(batch):
 # ── FASTQ streaming ───────────────────────────────────────────────────────────
 
 def fastq_pair_reader(r1_fp: str, r2_fp: str, batch_size: int):
-    """Generator yielding batches of (r1_seq, r2_seq) tuples."""
-    with gzip.open(r1_fp, "rt") as r1_fh, gzip.open(r2_fp, "rt") as r2_fh:
+    """Generator yielding batches of (r1_seq, r2_seq) tuples.
+
+    Uses pigz for parallel FASTQ decompression; faster than single-threaded gzip.open.
+    """
+    r1_proc = subprocess.Popen(["pigz", "-dc", r1_fp], stdout=subprocess.PIPE)
+    r2_proc = subprocess.Popen(["pigz", "-dc", r2_fp], stdout=subprocess.PIPE)
+    try:
+        r1_fh = io.TextIOWrapper(r1_proc.stdout)
+        r2_fh = io.TextIOWrapper(r2_proc.stdout)
         while True:
             batch = []
             for _ in range(batch_size):
@@ -117,6 +125,11 @@ def fastq_pair_reader(r1_fp: str, r2_fp: str, batch_size: int):
             if not batch:
                 break
             yield batch
+    finally:
+        r1_proc.stdout.close()
+        r2_proc.stdout.close()
+        r1_proc.wait()
+        r2_proc.wait()
 
 
 # ── aggregation ───────────────────────────────────────────────────────────────
