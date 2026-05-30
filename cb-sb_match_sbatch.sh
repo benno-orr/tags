@@ -33,5 +33,10 @@ python "$SCRIPT_DIR/cb-sb_match.py" \
     --tmp-dir /n/scratch/users/b/beo703 \
     "$@"
 
+python "$SCRIPT_DIR/saturation.py" \
+    "$o_dir/df_whitelist.txt" \
+    "$o_dir" \
+    "$(basename "$o_dir")"
+
 # Normally invoked by cb-sb_match_sub.py. Direct submission example:
 # sbatch cb-sb_match_sbatch.sh <R1.fastq.gz> <R2.fastq.gz> <whitelist> <odir> [--cb-fmats <arc_cb_fmats.csv>]

@@ -32,16 +32,16 @@ push.sh                  commit + push to benno-orr/tags, logging the reupload
 ```bash
 source /n/app/conda/miniforge3/24.11.3-0/etc/profile.d/conda.sh && conda activate dropme
 
-# 1. SB↔CB matching — one sbatch job per row with run==TRUE
+# SB↔CB matching + saturation curve — one sbatch job per row with run==TRUE
 python cb-sb_match_sub.py [--odir <ANALYSIS>/outputs/restored] \
                           [--csv config/file_paths.csv] \
                           [--log-dir <RUN>/logs] [--dry-run]
-
-# 2. Library complexity — once matching finishes
-python run_saturation_all.py --restored-dir <ANALYSIS>/outputs/restored \
-                             [--plots-dir <ANALYSIS>/plots] [--plt-id pltBOxx]
 ```
 
+- Each sbatch job runs matching then immediately runs `saturation.py` on the output —
+  `saturation_curve.csv`, `saturation_stats.csv`, and plots land in the same per-sample dir.
+  `run_saturation_all.py` is still available for re-running saturation standalone (e.g. with
+  a custom `--plt-id` or `--plots-dir`).
 - Output base is per-row from the CSV `odir` column, falling back to `--odir` (aliases
   `--odir-base`, `-odir`) for blank rows — one of the two must supply it. Each invocation
   creates a fresh timestamped run dir `<base>/<YYMMDD_HHMMSS>/`, and per-sample output lands
@@ -50,7 +50,6 @@ python run_saturation_all.py --restored-dir <ANALYSIS>/outputs/restored \
 - Each run dir is stamped with provenance: `pipeline_version.json` (git commit + dirty flag
   of the pipeline checkout, timestamp, csv path) and `file_paths.used.csv` (a snapshot of the
   sample table), so any output traces back to the exact pipeline version that produced it.
-- `run_saturation_all.py` `--plots-dir` defaults to each sample's own restored dir.
 
 ## `config/file_paths.csv`
 
