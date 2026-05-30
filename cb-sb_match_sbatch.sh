@@ -29,7 +29,7 @@ SCRIPT_DIR="${CBSB_PIPE_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 python "$SCRIPT_DIR/cb-sb_match.py" \
     "$r1_path" "$r2_path" "$wl_path" "$o_dir" \
     --workers 20 \
-    --batch-size 100000 \
+    --batch-size 500000 \
     --tmp-dir /n/scratch/users/b/beo703 \
     "$@"
 
